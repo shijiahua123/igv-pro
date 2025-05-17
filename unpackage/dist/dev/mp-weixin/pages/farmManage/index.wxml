@@ -1,0 +1,1 @@
+<view class="farm-manage-container"><view class="farm-list"></view><view class="add-farm"><u-button wx:if="{{b}}" u-s="{{['d']}}" class="add-farm-btn" bindclick="{{a}}" u-i="a3aaca06-0" bind:__l="__l" u-p="{{b}}">新建农场</u-button></view></view>

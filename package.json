@@ -1,0 +1,9 @@
+{
+  "name": "igv-pro",
+  "version": "1.0.0",
+  "description": "IGV Pro Application",
+  "main": "main.js",
+  "dependencies": {
+    "uview-plus": "^3.4.28"
+  }
+}
