@@ -6,7 +6,9 @@
     "pages/mine/mine",
     "pages/farmManage/index",
     "pages/farmManage/addFarm",
-    "pages/farmManage/drawFarm"
+    "pages/farmManage/drawFarm",
+    "pages/farmManage/addPlot",
+    "pages/farmManage/drawPlot"
   ],
   "window": {
     "navigationBarTextStyle": "black",

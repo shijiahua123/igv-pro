@@ -9,6 +9,8 @@ if (!Math) {
   "./pages/farmManage/index.js";
   "./pages/farmManage/addFarm.js";
   "./pages/farmManage/drawFarm.js";
+  "./pages/farmManage/addPlot.js";
+  "./pages/farmManage/drawPlot.js";
 }
 const _sfc_main = {
   data() {

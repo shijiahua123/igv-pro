@@ -30,6 +30,11 @@ const _sfc_main = {
         url: "/pages/farmManage/drawFarm"
       });
     };
+    const handleAddPlot = () => {
+      common_vendor.index.navigateTo({
+        url: "/pages/farmManage/addPlot"
+      });
+    };
     const handleCancel = () => {
       common_vendor.index.navigateBack();
     };
@@ -90,18 +95,19 @@ const _sfc_main = {
           name: "plus-circle",
           size: "20"
         }),
-        i: common_vendor.p({
+        i: common_vendor.o(handleAddPlot),
+        j: common_vendor.p({
           label: "地块",
           borderBottom: true
         }),
-        j: common_vendor.o(handleCancel),
-        k: common_vendor.p({
+        k: common_vendor.o(handleCancel),
+        l: common_vendor.p({
           text: "取消",
           plain: true,
           shape: "circle"
         }),
-        l: common_vendor.o(handleSave),
-        m: common_vendor.p({
+        m: common_vendor.o(handleSave),
+        n: common_vendor.p({
           text: "保存",
           type: "primary",
           shape: "circle"

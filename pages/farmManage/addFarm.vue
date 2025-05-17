@@ -62,7 +62,7 @@
                     <text class="add-farm-form-item-label-mark">（必填）</text>
                 </view>
             </template>
-            <view class="add-farm-form-item-content">
+            <view class="add-farm-form-item-content" @click="handleAddPlot">
                 <view class="add-form-custom-content">
                     <text class="add-form-custom-content-text">添加地块</text>
                     <u-icon name="plus-circle" size="20"></u-icon>
@@ -110,6 +110,13 @@ const formData = reactive({
 const handleSelectLocation = () => {
 	uni.navigateTo({
 		url: '/pages/farmManage/drawFarm'
+	})
+}
+
+// 添加地块
+const handleAddPlot = () => {
+	uni.navigateTo({
+		url: '/pages/farmManage/addPlot'
 	})
 }
 

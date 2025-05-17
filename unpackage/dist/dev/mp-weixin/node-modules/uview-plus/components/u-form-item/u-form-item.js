@@ -2,7 +2,7 @@
 const common_vendor = require("../../../../common/vendor.js");
 const _sfc_main = {
   name: "u-form-item",
-  mixins: [common_vendor.mpMixin, common_vendor.mixin, common_vendor.props$4],
+  mixins: [common_vendor.mpMixin, common_vendor.mixin, common_vendor.props$6],
   data() {
     return {
       // 错误提示语
@@ -26,7 +26,7 @@ const _sfc_main = {
   // 组件创建完成时，将当前实例保存到u-form中
   computed: {
     propsLine() {
-      return common_vendor.props$5.line;
+      return common_vendor.props$7.line;
     }
   },
   mounted() {

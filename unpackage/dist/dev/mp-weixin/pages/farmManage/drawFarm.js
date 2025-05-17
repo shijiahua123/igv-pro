@@ -1,26 +1,44 @@
 "use strict";
 const common_vendor = require("../../common/vendor.js");
 if (!Array) {
-  const _easycom_u_icon2 = common_vendor.resolveComponent("u-icon");
   const _easycom_u_popup2 = common_vendor.resolveComponent("u-popup");
-  (_easycom_u_icon2 + _easycom_u_popup2)();
+  _easycom_u_popup2();
 }
-const _easycom_u_icon = () => "../../node-modules/uview-plus/components/u-icon/u-icon.js";
 const _easycom_u_popup = () => "../../node-modules/uview-plus/components/u-popup/u-popup.js";
 if (!Math) {
-  (_easycom_u_icon + _easycom_u_popup)();
+  _easycom_u_popup();
 }
 const _sfc_main = {
   __name: "drawFarm",
   setup(__props) {
+    const defaultArea = [
+      {
+        latitude: 31.248507860319165,
+        longitude: 121.39593936804681
+      },
+      {
+        latitude: 31.248477941394082,
+        longitude: 121.39678339328987
+      },
+      {
+        latitude: 31.2478813169247,
+        longitude: 121.39674633851371
+      },
+      {
+        latitude: 31.247824998237835,
+        longitude: 121.39595583682228
+      }
+    ];
+    const isDisplayMode = common_vendor.ref(true);
     const isLoading = common_vendor.ref(true);
     const error = common_vendor.ref("");
     const showMapConfig = common_vendor.ref(false);
-    const latitude = common_vendor.ref(39.909);
-    const longitude = common_vendor.ref(116.397);
-    const scale = common_vendor.ref(14);
+    const latitude = common_vendor.ref(31.248507860319165);
+    const longitude = common_vendor.ref(121.39593936804681);
+    const scale = common_vendor.ref(18);
     const isMarking = common_vendor.ref(false);
     const points = common_vendor.ref([]);
+    const displayPoints = common_vendor.ref([...defaultArea]);
     const area = common_vendor.ref(0);
     const perimeter = common_vendor.ref(0);
     const currentMovePoint = common_vendor.ref(null);
@@ -63,6 +81,8 @@ const _sfc_main = {
       { name: "温度采集", icon: "", checked: false }
     ]);
     const markers = common_vendor.computed(() => {
+      if (isDisplayMode.value || !isMarking.value)
+        return [];
       return points.value.map((point, index) => ({
         id: index + 1,
         latitude: point.latitude,
@@ -89,37 +109,61 @@ const _sfc_main = {
         ],
         color: "#FFFFFF",
         width: 2,
-        dottedLine: true
+        dottedLine: true,
+        zIndex: 3
+        // 预览线在最上层
       }];
     });
     const polylines = common_vendor.computed(() => {
-      if (points.value.length < 2)
+      if (isDisplayMode.value)
+        return [];
+      if (!isMarking.value || points.value.length < 2)
         return [];
       const lines = [{
         points: points.value,
         color: "#FFFFFF",
         width: 2,
         dottedLine: false,
-        arrowLine: false
+        arrowLine: false,
+        zIndex: 3
+        // 连接线在最上层
       }];
       if (previewLine.value.length > 0) {
-        lines.push(...previewLine.value);
+        lines.push({
+          ...previewLine.value[0],
+          zIndex: 3
+          // 预览线也在最上层
+        });
       }
       return lines;
     });
     const polygons = common_vendor.computed(() => {
-      if (points.value.length < 3)
-        return [];
-      return [{
-        points: points.value,
-        strokeWidth: 2,
-        strokeColor: "#FF4500",
-        fillColor: "#FF450033"
-      }];
+      const result = [];
+      if (displayPoints.value.length >= 3) {
+        result.push({
+          points: displayPoints.value,
+          strokeWidth: 2,
+          strokeColor: "#2979ff",
+          fillColor: "#2979ff33",
+          zIndex: 1
+          // 默认区域在底层
+        });
+      }
+      if (!isDisplayMode.value && points.value.length >= 3) {
+        result.push({
+          points: points.value,
+          strokeWidth: 2,
+          strokeColor: "#FF4500",
+          fillColor: "#FF450033",
+          zIndex: 2
+          // 编辑区域在上层
+        });
+      }
+      return result;
     });
     const mapContext = common_vendor.ref(null);
     const closeMapConfig = () => {
-      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:281", "关闭图层");
+      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:304", "关闭图层");
       showMapConfig.value = false;
       common_vendor.index.showTabBar();
     };
@@ -143,6 +187,10 @@ const _sfc_main = {
       common_vendor.index.showTabBar();
     };
     const toggleMarking = () => {
+      if (isDisplayMode.value) {
+        isDisplayMode.value = false;
+        points.value = [];
+      }
       isMarking.value = !isMarking.value;
       if (!isMarking.value) {
         currentMovePoint.value = null;
@@ -273,13 +321,35 @@ const _sfc_main = {
         longitude: e.detail.longitude
       };
     };
+    const isPointInPolygon = (point, polygon) => {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].longitude;
+        const yi = polygon[i].latitude;
+        const xj = polygon[j].longitude;
+        const yj = polygon[j].latitude;
+        const intersect = yi > point.latitude !== yj > point.latitude && point.longitude < (xj - xi) * (point.latitude - yi) / (yj - yi) + xi;
+        if (intersect)
+          inside = !inside;
+      }
+      return inside;
+    };
     const handleMapTap = (e) => {
+      if (isDisplayMode.value)
+        return;
       if (!isMarking.value)
         return;
       const newPoint = {
         latitude: e.detail.latitude,
         longitude: e.detail.longitude
       };
+      if (!isPointInPolygon(newPoint, displayPoints.value)) {
+        common_vendor.index.showToast({
+          title: "请在蓝色区域内绘制",
+          icon: "none"
+        });
+        return;
+      }
       if (points.value.length >= 3 && canClosePath(newPoint)) {
         if (checkClosingLineIntersection()) {
           common_vendor.index.showToast({
@@ -348,37 +418,113 @@ const _sfc_main = {
       }
       area.value = Math.abs(totalArea * 6378137 * 6378137 / 4);
     };
-    const formatArea = (areaValue) => {
-      if (areaValue < 1e6) {
-        return `${areaValue.toFixed(2)} 平方米`;
-      } else {
-        return `${(areaValue / 1e6).toFixed(2)} 平方公里`;
-      }
-    };
-    const formatDistance = (distance) => {
-      if (distance < 1e3) {
-        return `${distance.toFixed(2)} 米`;
-      } else {
-        return `${(distance / 1e3).toFixed(2)} 公里`;
-      }
-    };
     const handleUndo = () => {
+      if (isDisplayMode.value)
+        return;
       if (points.value.length > 0) {
         points.value.pop();
       }
     };
+    const handleRelocate = async () => {
+      try {
+        const hasPermission = await checkPermission();
+        if (!hasPermission) {
+          const granted = await requestPermission();
+          if (!granted) {
+            common_vendor.index.showToast({
+              title: "需要位置权限才能使用",
+              icon: "none"
+            });
+            return;
+          }
+        }
+        if (!mapContext.value) {
+          mapContext.value = common_vendor.index.createMapContext("map");
+        }
+        mapContext.value.moveToLocation({
+          success: () => {
+            common_vendor.index.showToast({
+              title: "已定位到当前位置",
+              icon: "none"
+            });
+          },
+          fail: (err) => {
+            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:728", "移动到当前位置失败：", err);
+            common_vendor.index.showToast({
+              title: "定位失败，请重试",
+              icon: "none"
+            });
+          }
+        });
+      } catch (err) {
+        common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:736", "重新定位失败：", err);
+        common_vendor.index.showToast({
+          title: "定位失败，请重试",
+          icon: "none"
+        });
+      }
+    };
+    const handleFitMap = () => {
+      if (!mapContext.value) {
+        mapContext.value = common_vendor.index.createMapContext("map");
+      }
+      const pointsToFit = isDisplayMode.value ? displayPoints.value : points.value.length > 0 ? points.value : displayPoints.value;
+      if (pointsToFit.length === 0)
+        return;
+      let minLat = pointsToFit[0].latitude;
+      let maxLat = pointsToFit[0].latitude;
+      let minLng = pointsToFit[0].longitude;
+      let maxLng = pointsToFit[0].longitude;
+      pointsToFit.forEach((point) => {
+        minLat = Math.min(minLat, point.latitude);
+        maxLat = Math.max(maxLat, point.latitude);
+        minLng = Math.min(minLng, point.longitude);
+        maxLng = Math.max(maxLng, point.longitude);
+      });
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLng = (minLng + maxLng) / 2;
+      const latDiff = maxLat - minLat;
+      const lngDiff = maxLng - minLng;
+      const maxDiff = Math.max(latDiff, lngDiff);
+      let zoomLevel = Math.floor(Math.log2(360 / maxDiff)) + 1;
+      zoomLevel = Math.min(Math.max(zoomLevel, 3), 20);
+      mapContext.value.includePoints({
+        points: pointsToFit,
+        padding: [50, 50, 50, 50],
+        // 设置内边距，单位px
+        success: () => {
+          latitude.value = centerLat;
+          longitude.value = centerLng;
+          scale.value = zoomLevel;
+          common_vendor.index.showToast({
+            title: "已自适应显示",
+            icon: "none"
+          });
+        },
+        fail: (err) => {
+          common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:804", "设置地图视野失败：", err);
+          common_vendor.index.showToast({
+            title: "自适应显示失败",
+            icon: "none"
+          });
+        }
+      });
+    };
     const handleSave = () => {
+      if (isDisplayMode.value)
+        return;
       if (points.value.length === 0)
         return;
-      const markData = {
+      ({
         points: points.value,
         timestamp: Date.now()
-      };
-      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:701", "保存标记数据：", markData);
+      });
+      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:833", "保存标记数据：", points.value);
       common_vendor.index.showToast({
         title: "保存成功",
         icon: "success"
       });
+      isDisplayMode.value = true;
       points.value = [];
       isMarking.value = false;
     };
@@ -393,7 +539,7 @@ const _sfc_main = {
             }
           },
           fail: (err) => {
-            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:724", "获取设置失败：", err);
+            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:858", "获取设置失败：", err);
             reject(err);
           }
         });
@@ -407,7 +553,7 @@ const _sfc_main = {
             resolve(true);
           },
           fail: (err) => {
-            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:740", "权限请求失败：", err);
+            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:874", "权限请求失败：", err);
             common_vendor.index.showModal({
               title: "需要位置权限",
               content: "请在小程序设置中开启位置权限",
@@ -442,7 +588,7 @@ const _sfc_main = {
             resolve(res);
           },
           fail: (err) => {
-            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:778", "获取位置失败：", err);
+            common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:912", "获取位置失败：", err);
             reject(err);
           }
         });
@@ -466,34 +612,40 @@ const _sfc_main = {
         longitude.value = location.longitude;
         isLoading.value = false;
       } catch (err) {
-        common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:813", "位置服务异常：", err);
+        common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:947", "位置服务异常：", err);
         error.value = "获取位置失败，请检查定位服务是否开启";
         isLoading.value = false;
       }
     };
     const handleRegionChange = (e) => {
-      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:821", "地图区域改变", e);
+      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:955", "地图区域改变", e);
     };
     const handleMapUpdated = (e) => {
-      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:826", "地图更新完成", e);
+      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:960", "地图更新完成", e);
       isLoading.value = false;
     };
     const handleMapError = (e) => {
-      common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:832", "地图加载错误：", e);
+      common_vendor.index.__f__("error", "at pages/farmManage/drawFarm.vue:966", "地图加载错误：", e);
       error.value = "地图加载失败，请检查网络连接";
       isLoading.value = false;
     };
     const handleRetry = () => {
       getCurrentLocation();
     };
-    const handleLayerClick = () => {
-      common_vendor.index.__f__("log", "at pages/farmManage/drawFarm.vue:844", "点击图层按钮");
-      showMapConfig.value = true;
-      common_vendor.index.hideTabBar();
-    };
     common_vendor.onMounted(() => {
-      getCurrentLocation();
       mapContext.value = common_vendor.index.createMapContext("map");
+      if (displayPoints.value.length >= 3) {
+        const tempPoints = points.value;
+        points.value = displayPoints.value;
+        calculateAreaAndPerimeter();
+        points.value = tempPoints;
+        setTimeout(() => {
+          handleFitMap();
+        }, 1e3);
+      }
+      setTimeout(() => {
+        isLoading.value = false;
+      }, 1e3);
     });
     return (_ctx, _cache) => {
       return common_vendor.e({
@@ -501,54 +653,40 @@ const _sfc_main = {
       }, isLoading.value ? {} : error.value ? {
         c: common_vendor.t(error.value),
         d: common_vendor.o(handleRetry)
-      } : common_vendor.e({
-        e: isMarking.value
-      }, isMarking.value ? {} : {}, {
-        f: latitude.value,
-        g: longitude.value,
-        h: markers.value,
-        i: polylines.value,
-        j: polygons.value,
-        k: scale.value,
-        l: mapType.value === "satellite",
-        m: mapSetting,
-        n: common_vendor.o(handleRegionChange),
-        o: common_vendor.o(handleMapTap),
-        p: common_vendor.o(handleMapUpdated),
-        q: common_vendor.o(handleMapError),
-        r: common_vendor.o(handleMapMove)
-      }), {
+      } : {
+        e: latitude.value,
+        f: longitude.value,
+        g: markers.value,
+        h: polylines.value,
+        i: polygons.value,
+        j: scale.value,
+        k: mapType.value === "satellite",
+        l: mapSetting,
+        m: common_vendor.o(handleRegionChange),
+        n: common_vendor.o(handleMapTap),
+        o: common_vendor.o(handleMapUpdated),
+        p: common_vendor.o(handleMapError),
+        q: common_vendor.o(handleMapMove)
+      }, {
         b: error.value,
-        s: common_vendor.p({
-          name: "map",
-          size: "20"
-        }),
-        t: common_vendor.o(handleLayerClick),
-        v: common_vendor.p({
-          name: "cut",
-          size: "20"
-        }),
-        w: points.value.length > 0
+        r: common_vendor.o(handleRelocate),
+        s: common_vendor.o(handleFitMap),
+        t: points.value.length > 0
       }, points.value.length > 0 ? {
-        x: common_vendor.o(handleUndo)
+        v: common_vendor.o(handleUndo)
       } : {}, {
-        y: common_vendor.o(toggleMarking),
-        z: points.value.length > 0
+        w: common_vendor.o(toggleMarking),
+        x: points.value.length > 0
       }, points.value.length > 0 ? {
-        A: common_vendor.o(handleSave)
+        y: common_vendor.o(handleSave)
       } : {}, {
-        B: area.value > 0
-      }, area.value > 0 ? {
-        C: common_vendor.t(formatArea(area.value)),
-        D: common_vendor.t(formatDistance(perimeter.value))
-      } : {}, {
-        E: mapType.value === "standard" ? 1 : "",
-        F: common_vendor.o(($event) => handleMapTypeChange("standard")),
-        G: mapType.value === "satellite" ? 1 : "",
-        H: common_vendor.o(($event) => handleMapTypeChange("satellite")),
-        I: common_vendor.o(handleConfigConfirm),
-        J: common_vendor.o(closeMapConfig),
-        K: common_vendor.p({
+        z: mapType.value === "standard" ? 1 : "",
+        A: common_vendor.o(($event) => handleMapTypeChange("standard")),
+        B: mapType.value === "satellite" ? 1 : "",
+        C: common_vendor.o(($event) => handleMapTypeChange("satellite")),
+        D: common_vendor.o(handleConfigConfirm),
+        E: common_vendor.o(closeMapConfig),
+        F: common_vendor.p({
           show: showMapConfig.value,
           mode: "bottom",
           round: 10,

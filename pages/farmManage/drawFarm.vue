@@ -35,16 +35,16 @@
 			@error="handleMapError"
 			@move="handleMapMove"
 		>
-			<view class="map-crosshair" v-if="isMarking"></view>
+			<!-- <view class="map-crosshair" v-if="isMarking"></view> -->
 		</map>
 
 		<!-- 顶部工具栏 -->
 		<view class="top-toolbar">
-			<view class="tool-box" @tap="handleLayerClick">
-				<u-icon name="map" size="20"></u-icon>
+			<view class="tool-box" @tap="handleRelocate">
+				<text>重置</text>
 			</view>
-			<view class="tool-box">
-				<u-icon name="cut" size="20"></u-icon>
+			<view class="tool-box" @tap="handleFitMap">
+				<text>自适</text>
 			</view>
 		</view>
 
@@ -62,10 +62,10 @@
 		</view>
 
 		<!-- 面积信息 -->
-		<view class="info-panel" v-if="area > 0">
+		<!-- <view class="info-panel" v-if="area > 0">
 			<text>面积: {{ formatArea(area) }}</text>
 			<text>周长: {{ formatDistance(perimeter) }}</text>
-		</view>
+		</view> -->
 
 		<!-- 地图配置弹出层 -->
 		<u-popup
@@ -105,36 +105,6 @@
 							</view>
 						</view>
 					</view>
-
-					<!-- 地图显示 -->
-					<!-- <view class="section">
-						<text class="section-title">地图显示</text>
-						<view class="switch-list">
-							<view class="switch-item" v-for="(item, index) in displayItems" :key="index">
-								<text>{{ item.name }}</text>
-								<switch 
-									:checked="item.checked"
-									@change="(e) => item.checked = e.detail.value"
-									color="#0F40F5"
-								/>
-							</view>
-						</view>
-					</view> -->
-
-					<!-- 扩展设备 -->
-					<!-- <view class="section">
-						<text class="section-title">扩展的输入设备</text>
-						<view class="switch-list">
-							<view class="switch-item" v-for="(item, index) in deviceItems" :key="index">
-								<text>{{ item.name }}</text>
-								<switch 
-									:checked="item.checked"
-									@change="(e) => item.checked = e.detail.value"
-									color="#0F40F5"
-								/>
-							</view>
-						</view>
-					</view> -->
 				</view>
 
 				<view class="popup-footer">
@@ -148,6 +118,29 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 
+// 默认显示的区域坐标
+const defaultArea = [
+	{
+		latitude: 31.248507860319165,
+		longitude: 121.39593936804681
+	},
+	{
+		latitude: 31.248477941394082,
+		longitude: 121.39678339328987
+	},
+	{
+		latitude: 31.2478813169247,
+		longitude: 121.39674633851371
+	},
+	{
+		latitude: 31.247824998237835,
+		longitude: 121.39595583682228
+	}
+]
+
+// 是否是展示模式
+const isDisplayMode = ref(true)
+
 // 加载状态
 const isLoading = ref(true)
 const error = ref('')
@@ -156,13 +149,14 @@ const error = ref('')
 const showMapConfig = ref(false)
 
 // 地图中心点坐标
-const latitude = ref(39.909)
-const longitude = ref(116.397)
-const scale = ref(14)
+const latitude = ref(31.248507860319165)
+const longitude = ref(121.39593936804681)
+const scale = ref(18)
 
 // 打点模式
 const isMarking = ref(false)
-const points = ref([])
+const points = ref([]) // 编辑时的点
+const displayPoints = ref([...defaultArea]) // 展示用的点
 const area = ref(0)
 const perimeter = ref(0)
 
@@ -210,6 +204,9 @@ const deviceItems = ref([
 
 // 计算属性：标记点
 const markers = computed(() => {
+	// 只在编辑模式且打点模式下显示标记点
+	if (isDisplayMode.value || !isMarking.value) return []
+	
 	return points.value.map((point, index) => ({
 		id: index + 1,
 		latitude: point.latitude,
@@ -238,25 +235,33 @@ const previewLine = computed(() => {
 		],
 		color: '#FFFFFF',
 		width: 2,
-		dottedLine: true
+		dottedLine: true,
+		zIndex: 3 // 预览线在最上层
 	}]
 })
 
 // 计算属性：所有线段
 const polylines = computed(() => {
-	if (points.value.length < 2) return []
+	// 展示模式下不显示连接线
+	if (isDisplayMode.value) return []
+	
+	// 编辑模式下的连接线逻辑
+	if (!isMarking.value || points.value.length < 2) return []
 	
 	const lines = [{
 		points: points.value,
 		color: '#FFFFFF',
 		width: 2,
 		dottedLine: false,
-		arrowLine: false
+		arrowLine: false,
+		zIndex: 3 // 连接线在最上层
 	}]
 	
-	// 添加预览线
 	if (previewLine.value.length > 0) {
-		lines.push(...previewLine.value)
+		lines.push({
+			...previewLine.value[0],
+			zIndex: 3 // 预览线也在最上层
+		})
 	}
 	
 	return lines
@@ -264,13 +269,31 @@ const polylines = computed(() => {
 
 // 计算属性：多边形
 const polygons = computed(() => {
-	if (points.value.length < 3) return []
-	return [{
-		points: points.value,
-		strokeWidth: 2,
-		strokeColor: '#FF4500',
-		fillColor: '#FF450033'
-	}]
+	const result = []
+	
+	// 如果有默认区域，始终显示
+	if (displayPoints.value.length >= 3) {
+		result.push({
+			points: displayPoints.value,
+			strokeWidth: 2,
+			strokeColor: '#2979ff',
+			fillColor: '#2979ff33',
+			zIndex: 1 // 默认区域在底层
+		})
+	}
+	
+	// 编辑模式下显示编辑的区域
+	if (!isDisplayMode.value && points.value.length >= 3) {
+		result.push({
+			points: points.value,
+			strokeWidth: 2,
+			strokeColor: '#FF4500',
+			fillColor: '#FF450033',
+			zIndex: 2 // 编辑区域在上层
+		})
+	}
+	
+	return result
 })
 
 // 地图实例
@@ -322,6 +345,12 @@ const handleConfigConfirm = () => {
 
 // 切换打点模式
 const toggleMarking = () => {
+	// 如果是展示模式，切换到编辑模式
+	if (isDisplayMode.value) {
+		isDisplayMode.value = false
+		points.value = [] // 清空编辑点
+	}
+	
 	// 切换打点状态
 	isMarking.value = !isMarking.value
 	
@@ -505,13 +534,41 @@ const handleMapMove = (e) => {
 	}
 }
 
+// 判断点是否在多边形内部
+const isPointInPolygon = (point, polygon) => {
+	let inside = false
+	for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+		const xi = polygon[i].longitude
+		const yi = polygon[i].latitude
+		const xj = polygon[j].longitude
+		const yj = polygon[j].latitude
+		
+		const intersect = ((yi > point.latitude) !== (yj > point.latitude)) &&
+			(point.longitude < (xj - xi) * (point.latitude - yi) / (yj - yi) + xi)
+		if (intersect) inside = !inside
+	}
+	return inside
+}
+
 // 处理地图点击
 const handleMapTap = (e) => {
+	// 展示模式下不响应点击
+	if (isDisplayMode.value) return
+	
 	if (!isMarking.value) return
 	
 	const newPoint = {
 		latitude: e.detail.latitude,
 		longitude: e.detail.longitude
+	}
+	
+	// 检查点是否在默认区域内
+	if (!isPointInPolygon(newPoint, displayPoints.value)) {
+		uni.showToast({
+			title: '请在蓝色区域内绘制',
+			icon: 'none'
+		})
+		return
 	}
 	
 	// 检查是否可以闭合
@@ -628,6 +685,9 @@ const formatDistance = (distance) => {
 
 // 撤销上一个点
 const handleUndo = () => {
+	// 展示模式下不允许撤销
+	if (isDisplayMode.value) return
+	
 	if (points.value.length > 0) {
 		points.value.pop()
 	}
@@ -681,6 +741,75 @@ const handleRelocate = async () => {
 	}
 }
 
+// 自适应
+const handleFitMap = () => {
+	// 如果地图实例不存在，初始化它
+	if (!mapContext.value) {
+		mapContext.value = uni.createMapContext('map')
+	}
+	
+	// 获取需要显示的点集合
+	const pointsToFit = isDisplayMode.value ? displayPoints.value : 
+		(points.value.length > 0 ? points.value : displayPoints.value)
+	
+	if (pointsToFit.length === 0) return
+	
+	// 计算边界
+	let minLat = pointsToFit[0].latitude
+	let maxLat = pointsToFit[0].latitude
+	let minLng = pointsToFit[0].longitude
+	let maxLng = pointsToFit[0].longitude
+	
+	// 找出最大最小经纬度
+	pointsToFit.forEach(point => {
+		minLat = Math.min(minLat, point.latitude)
+		maxLat = Math.max(maxLat, point.latitude)
+		minLng = Math.min(minLng, point.longitude)
+		maxLng = Math.max(maxLng, point.longitude)
+	})
+	
+	// 计算中心点
+	const centerLat = (minLat + maxLat) / 2
+	const centerLng = (minLng + maxLng) / 2
+	
+	// 计算合适的缩放级别
+	// 根据经纬度差值计算缩放级别
+	const latDiff = maxLat - minLat
+	const lngDiff = maxLng - minLng
+	const maxDiff = Math.max(latDiff, lngDiff)
+	
+	// 缩放级别计算公式（根据经验值调整）
+	// 数字越大，缩放级别越小，视野越大
+	let zoomLevel = Math.floor(Math.log2(360 / maxDiff)) + 1
+	
+	// 限制缩放级别范围
+	zoomLevel = Math.min(Math.max(zoomLevel, 3), 20)
+	
+	// 设置地图视野
+	mapContext.value.includePoints({
+		points: pointsToFit,
+		padding: [50, 50, 50, 50], // 设置内边距，单位px
+		success: () => {
+			// 设置中心点和缩放级别
+			latitude.value = centerLat
+			longitude.value = centerLng
+			scale.value = zoomLevel
+			
+			uni.showToast({
+				title: '已自适应显示',
+				icon: 'none'
+			})
+		},
+		fail: (err) => {
+			console.error('设置地图视野失败：', err)
+			uni.showToast({
+				title: '自适应显示失败',
+				icon: 'none'
+			})
+		}
+	})
+}
+
 // 搜索位置
 const handleSearch = () => {
 	uni.showToast({
@@ -691,6 +820,9 @@ const handleSearch = () => {
 
 // 保存标记
 const handleSave = () => {
+	// 展示模式下不允许保存
+	if (isDisplayMode.value) return
+	
 	if (points.value.length === 0) return
 	
 	const markData = {
@@ -698,13 +830,15 @@ const handleSave = () => {
 		timestamp: Date.now()
 	}
 	
-	console.log('保存标记数据：', markData)
+	console.log('保存标记数据：', points.value)
+	
 	uni.showToast({
 		title: '保存成功',
 		icon: 'success'
 	})
 	
-	// 清除当前标记
+	// 保存后切换回展示模式
+	isDisplayMode.value = true
 	points.value = []
 	isMarking.value = false
 }
@@ -848,11 +982,28 @@ const handleLayerClick = () => {
 	uni.hideTabBar()
 }
 
-// 页面加载时获取位置和初始化地图实例
+// 页面加载时初始化
 onMounted(() => {
-	getCurrentLocation()
 	// 初始化地图实例
 	mapContext.value = uni.createMapContext('map')
+	
+	// 如果有默认数据，计算展示区域的面积和周长
+	if (displayPoints.value.length >= 3) {
+		const tempPoints = points.value
+		points.value = displayPoints.value
+		calculateAreaAndPerimeter()
+		points.value = tempPoints
+		
+		// 延迟执行自适应，确保地图组件已完全加载
+		setTimeout(() => {
+			handleFitMap()
+		}, 1000)
+	}
+	
+	// 延迟关闭loading
+	setTimeout(() => {
+		isLoading.value = false
+	}, 1000)
 })
 </script>
 

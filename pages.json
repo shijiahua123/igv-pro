@@ -54,6 +54,20 @@
 				"navigationBarTitleText": "绘制农场",
 				"enablePullDownRefresh": false
 			}
+		},
+		{
+			"path": "pages/farmManage/addPlot",
+			"style": {
+				"navigationBarTitleText": "添加地块",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/farmManage/drawPlot",
+			"style": {
+				"navigationBarTitleText": "绘制地块",
+				"enablePullDownRefresh": false
+			}
 		}
 	],
 	"globalStyle": {
